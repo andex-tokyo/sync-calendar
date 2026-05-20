@@ -102,6 +102,7 @@ export default {
       }
 
       if (request.method === "GET" && url.pathname === "/oauth/start") {
+        requireAdminForOauthStart(request, env);
         return oauthStart(request, env);
       }
 
@@ -208,8 +209,8 @@ async function runSync(env: Env, triggerType: TriggerType): Promise<{ ok: boolea
         config,
         pair,
         stats,
-        aChanges.fullSync && pair.calendar_a_event_id ? eventMapA.get(pair.calendar_a_event_id) ?? null : undefined,
-        bChanges.fullSync && pair.calendar_b_event_id ? eventMapB.get(pair.calendar_b_event_id) ?? null : undefined
+        pair.calendar_a_event_id && eventMapA.has(pair.calendar_a_event_id) ? eventMapA.get(pair.calendar_a_event_id)! : undefined,
+        pair.calendar_b_event_id && eventMapB.has(pair.calendar_b_event_id) ? eventMapB.get(pair.calendar_b_event_id)! : undefined
       );
     }
 
@@ -452,6 +453,30 @@ async function handleDeletes(
     stats.recordedDeletes++;
     log("info", "delete_recorded_without_propagation", { pairId: pair.pair_id, deletedA, deletedB });
     return;
+  }
+
+  if (deletedA && !deletedB && eventA && eventB) {
+    const changedB = await eventHash(eventB) !== pair.last_synced_hash_b;
+    if (changedB && compareUpdated(eventA.updated, eventB.updated) < 0) {
+      const recreatedA = await createEvent(accessToken, config.calendarAId, toWritableEvent(eventB));
+      await updatePairAfterRecreate(env, pair.pair_id, "a", recreatedA, eventB);
+      stats.conflicts++;
+      stats.createdA++;
+      log("info", "deleted_event_recreated_from_newer_update", { pairId: pair.pair_id, recreated: "a" });
+      return;
+    }
+  }
+
+  if (deletedB && !deletedA && eventA && eventB) {
+    const changedA = await eventHash(eventA) !== pair.last_synced_hash_a;
+    if (changedA && compareUpdated(eventB.updated, eventA.updated) < 0) {
+      const recreatedB = await createEvent(accessToken, config.calendarBId, toWritableEvent(eventA));
+      await updatePairAfterRecreate(env, pair.pair_id, "b", eventA, recreatedB);
+      stats.conflicts++;
+      stats.createdB++;
+      log("info", "deleted_event_recreated_from_newer_update", { pairId: pair.pair_id, recreated: "b" });
+      return;
+    }
   }
 
   if (deletedA && pair.calendar_b_event_id) {
@@ -740,6 +765,34 @@ async function updatePairSnapshot(env: Env, pairId: string, eventA: CalendarEven
   ).run();
 }
 
+async function updatePairAfterRecreate(env: Env, pairId: string, recreatedSide: Side, eventA: CalendarEvent, eventB: CalendarEvent): Promise<void> {
+  const now = nowIso();
+  const eventIdColumn = recreatedSide === "a" ? "calendar_a_event_id" : "calendar_b_event_id";
+  const eventId = recreatedSide === "a" ? eventA.id : eventB.id;
+
+  await env.DB.prepare(
+    `UPDATE event_pairs
+     SET ${eventIdColumn} = ?,
+         last_synced_hash_a = ?, last_synced_hash_b = ?,
+         last_synced_updated_a = ?, last_synced_updated_b = ?,
+         status = 'active',
+         deleted_a_at = NULL,
+         deleted_b_at = NULL,
+         last_seen_at = ?,
+         updated_at = ?
+     WHERE pair_id = ?`
+  ).bind(
+    eventId,
+    await eventHash(eventA),
+    await eventHash(eventB),
+    eventA.updated ?? null,
+    eventB.updated ?? null,
+    now,
+    now,
+    pairId
+  ).run();
+}
+
 async function finishRun(env: Env, runId: string, status: string, message: string, stats: SyncStats): Promise<void> {
   await env.DB.prepare("UPDATE sync_runs SET status = ?, finished_at = ?, message = ?, stats_json = ? WHERE id = ?")
     .bind(status, nowIso(), message.slice(0, 1000), JSON.stringify(stats), runId)
@@ -875,6 +928,13 @@ function requireAdmin(request: Request, env: Env): void {
   if (!env.ADMIN_TOKEN || request.headers.get("authorization") !== expected) {
     throw new HttpError(401, "unauthorized");
   }
+}
+
+function requireAdminForOauthStart(request: Request, env: Env): void {
+  const url = new URL(request.url);
+  const token = url.searchParams.get("admin_token");
+  if (token && env.ADMIN_TOKEN && timingSafeEqual(token, env.ADMIN_TOKEN)) return;
+  requireAdmin(request, env);
 }
 
 function emptyStats(): SyncStats {

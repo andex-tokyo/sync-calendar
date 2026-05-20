@@ -110,10 +110,10 @@ curl http://localhost:8787/health
 
 ## 初回OAuth
 
-ブラウザで以下を開きます。
+ブラウザで以下を開きます。`/oauth/start` はトークン上書きを防ぐため、管理者トークンが必要です。
 
 ```text
-http://localhost:8787/oauth/start
+http://localhost:8787/oauth/start?admin_token=<ADMIN_TOKEN>
 ```
 
 両方のカレンダーに読み書きできるGoogleアカウントで認可してください。完了するとD1の `oauth_tokens` にトークンが保存されます。
