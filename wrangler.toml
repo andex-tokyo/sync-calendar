@@ -1,0 +1,17 @@
+name = "sync-calendar"
+main = "src/index.ts"
+compatibility_date = "2026-05-20"
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "calendar_sync_db"
+database_id = "0da64bf3-ab0d-4d22-9128-f411478c8090"
+
+[vars]
+CALENDAR_A_ID = "tsuchida@andex.tokyo"
+CALENDAR_B_ID = "tsucchy.me@gmail.com"
+SYNC_DAYS = "60"
+ENABLE_DELETE_SYNC = "true"

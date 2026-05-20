@@ -1,0 +1,18 @@
+{
+  "name": "sync-calendar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "tsc --noEmit",
+    "db:migrations:local": "wrangler d1 migrations apply calendar_sync_db --local",
+    "db:migrations:remote": "wrangler d1 migrations apply calendar_sync_db --remote"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260520.0",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.18.0"
+  }
+}
