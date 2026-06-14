@@ -81,7 +81,7 @@ OAUTH_REDIRECT_URI=http://localhost:8787/oauth/callback
 
 CALENDAR_A_ID=tsuchida@andex.tokyo
 CALENDAR_B_ID=tsucchy.me@gmail.com
-SYNC_DAYS=60
+SYNC_DAYS=90
 ENABLE_DELETE_SYNC=true
 ```
 
