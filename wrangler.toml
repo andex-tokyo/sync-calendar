@@ -14,5 +14,5 @@ database_id = "0da64bf3-ab0d-4d22-9128-f411478c8090"
 [vars]
 CALENDAR_A_ID = "tsuchida@andex.tokyo"
 CALENDAR_B_ID = "tsucchy.me@gmail.com"
-SYNC_DAYS = "90"
+SYNC_DAYS = "365"
 ENABLE_DELETE_SYNC = "true"
